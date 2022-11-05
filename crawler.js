@@ -3,36 +3,36 @@ const cheerio = require('cheerio');
 const fs = require('fs');
 
 const url = global.process.argv[2] || 'https://www.iban.com/exchange-rates';
-console.log(url);
-const depth = +global.process.argv[3] || 3;
-console.log('Depth: ' + depth);
-
-let depthIndex = 0;
+console.log(`Url: ${url}`);
+const depth = +global.process.argv[3] || 2;
+console.log(`Depth: ${depth}`);
 
 const results = [];
 
-crawl(url, depthIndex);
+crawl(url, 0);
 
 function crawl(url, depthIndex) {
     if (depthIndex === depth) {
         return;
     }
-    fetchData(url).then( (res) => {
-        const html = res.data;
-        fetchImages(html);
-        fetchLinks(html);
-        writeToFile();
+    fetchData(url, depthIndex).then( (res) => {
+        if (res && res.data) {
+            const html = res.data;
+            fetchImages(depthIndex, html);
+            fetchLinks(depthIndex, html);
+            writeToFile(depthIndex);
+        }
     });
 }
 
-function writeToFile() {
+function writeToFile(depthIndex) {
     fs.writeFile('results.json', JSON.stringify({ results }), (err) => {
         if (err) { throw err; }
-        console.log(`${url} -> Success!`);
+        console.log(`${depthIndex}: ${url} -> Success!`);
     });
 }
 
-function fetchLinks(html) {
+function fetchLinks(depthIndex, html) {
     depthIndex++;
     const $ = cheerio.load(html);
     $('a').each(function(i, element) {
@@ -41,7 +41,7 @@ function fetchLinks(html) {
     });
 }
 
-function fetchImages(html) {
+function fetchImages(depthIndex, html) {
     const $ = cheerio.load(html);
     $('img').each(function(i, element) {
         const img = $(this);
@@ -50,13 +50,13 @@ function fetchImages(html) {
     });
 }
 
-async function fetchData(url) {
-    console.log('Crawling data...')
+async function fetchData(url, depthIndex) {
+    console.log(`${depthIndex}: ${url} -> Crawling data...`);
     // make http call to url
-    let response = await axios(url).catch((err) => console.log(err));
+    let response = await axios(url).catch((err) => console.log(`${depthIndex}: ${url} -> ${err.message}`));
 
-    if (response.status !== 200) {
-        console.log("Error occurred while fetching data");
+    if (!response || response.status !== 200) {
+        console.log(`${depthIndex}: ${url} -> Error occurred while fetching data`);
         return;
     }
     return response;
